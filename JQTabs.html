@@ -1,0 +1,312 @@
+<!doctype html>
+<html>
+	<head>
+		<meta charset="utf-8">
+		<title>JQuery Tabs</title>	
+		<link rel="stylesheet" href="iw_examples.css"/>
+		<style>	
+		.tabs > nav > ul {overflow:hidden; margin:0; padding:0; list-style:none;}
+		.tabs > nav > ul > li {float:left; border-top: 2px solid #4285f4; border-left: 1px solid #4285f4; border-right: 1px solid #4285f4; margin-right:2px; padding:2px; cursor: pointer;}
+		.tabs > nav > ul > li.active {color: white; background-color: #4285f4;}
+		.tabs .tabcontent {border: 1px solid #4285f4; padding:2px; }
+		.tabs .tabcontent > section {display:none; }
+		.tabs .tabcontent > section.active {display:block}		
+		/* impostazioni accessibili */
+		.tabs.v1bis > nav {display:none;}
+		.tabs.v1bis .tabcontent > section {display:block; }
+		.tabs.v1bis.enabled > nav {display:block;}
+		.tabs.v1bis.enabled .tabcontent > section {display:none}		
+		.tabs.v1bis.enabled .tabcontent > section.active {display:block}		
+		</style>
+		
+		<script src="jquery.min.js">/* */</script>
+		
+		<script>
+		
+		//questa funzione lavora su una struttura ben definita di HTML + CSS, e ne sfrutta
+		//le caratteristiche (classi, tag, attributi) per manipolarla in maniera semplice e aggiungere
+		//la dinamica del "tabbed panel"
+		function makeTabs(container) {
+			var tabcontainer = $(container);
+			//la classe enabled è utile per "marcare" un elemento
+			//su cui lo script sta operando. Nel nostro caso, le linguette nei container
+			//marcati con questa classe sono nascoste di default, mentre se la classe manca sono visibili.
+			//In questo modo, se lo script non intervene, i contenuti saranno comunque visibili all'utente.
+			tabcontainer.addClass("enabled");
+			//agganciamo la logica all'evento click sulla linguetta
+			//con un handler su ogni tab:
+			//$("[role='tablist'] > [role='tab']",tabcontainer).click(function(){ 
+			//oppure cone la event delegation, che rende l'operazione acora più snella:
+			$("[role='tablist']",tabcontainer).on("click","[role='tab']",function(){ 
+				var tab = $(this);
+				if (tab.hasClass("active")) return;
+				var tabid = tab.attr("aria-controls");
+				var panel = $("#"+tabid,tabcontainer);
+			
+				//lo script non mostra o nasconde nulla direttamente: tutta la dinamica è ottenuta manipolando le classi
+				//agganciate ai vari elementi, e lasciando che siano i selettori e le regole CSS a fare il resto
+				$("[role='tablist'] > [role='tab']", tabcontainer).attr("aria-selected","false").removeClass("active"); 
+				tab.attr("aria-selected","true").addClass("active");  
+				$("[role='tabpanel']",tabcontainer).attr("aria-hidden","true").removeClass("active");  
+				panel.attr("aria-hidden","false").addClass("active");  
+				//questo evento custom non viene utilizzato dallo script: potrà essere catturato dall'esterno
+				//per agganciare logica ulteriore all'evento di "cambio tab"
+				tabcontainer.trigger("awdtabs:change",tab);
+				//RICEVENTE: $(document).on("awdtabs:change",function(e,a2){comsole.log(a2)})
+			});
+		}
+		
+		//la funzione che segue prima manipola il container per creare tutto il
+		//markup richiesto da un tabcontainer "standard", poi richiama makeTabs
+		//per attivarlo
+		function makeTabs2(container) {
+			var tabcontainer = $(container);			
+			if (tabcontainer.hasClass("tabs")) {					
+				var tablist = $("<ul role='tablist'/>");	
+				var panels = $("> section",tabcontainer);
+				if (panels.filter(".active").length==0) panels.first().addClass("active");
+				panels.wrapAll("<div class='tabcontent'/>");
+				panels.each(function(){    
+				   var uid=Math.floor(Math.random() * 26) + Date.now();	
+				   var panel = $(this)
+				   //jQuery non ha un metodo hasAttribute, quindi usiamo quello del DOM 
+				   //estraendo l'oggetto DOM dall'array...
+				   var tabid = (panel[0].hasAttribute("id") ? panel.attr("id") : ("tabx"+(uid)));
+				   var tabtitle = (panel[0].hasAttribute("data-label") ? 
+					panel.attr("data-label") : 
+					(panel.has("header").length>0?
+						$("header",panel).text():
+						"Tab "+(panel.index()+1)));
+				   var tab = $("<li role='tab'/>");	
+				   tab.attr("aria-controls",tabid);
+				   tab.text(tabtitle); 
+				   panel.attr("id",tabid);
+				   panel.attr("role","tabpanel");
+				   if (panel.hasClass("active")) {
+					 tab.addClass("active");
+					 tab.attr("aria-selected","true");
+					 panel.attr("aria-hidden","false");
+				   } else {
+					 tab.attr("aria-selected","false");
+					 panel.attr("aria-hidden","true");    
+				   }				   				  
+				   tablist.append(tab);
+				  });			  
+				tabcontainer.prepend($("<nav/>").append(tablist));
+				makeTabs(container);
+			}	
+		}
+	
+
+		$(function() {
+		
+			//agganciamo come estensione di JQeury una funzione che richiama la nostra makeTabs su tutti gli elementi selezionati
+			//ritorniamo this (restituito a sua volta da thiseach) per permettere la concatenazione dei metodi di JQuery			
+			jQuery.fn["awdTabs"] = function(){return this.each(function(){makeTabs(this)})};
+			//oppure jQuery.fn.extend({awdTabs: function(){return this.each(function(){makeTabs(this)})}});
+			
+			/*---------------------------------------------------------*/
+			
+			//usiamo l'estensione di JQuery appena definita
+			$(".tabs.v0:first").awdTabs();
+			
+			/*---------------------------------------------------------*/
+				
+			//oppure popssiamo chuiamare direttamente la nostra funzione su oggetti DOM selezionati con JQuery
+			$(".tabs.v1").each(function(){ 
+				makeTabs(this);
+			});
+			
+			/*---------------------------------------------------------*/
+			
+			$(".tabs.v1bis").each(function(){ 
+				makeTabs(this);
+			});
+			
+			
+			/*---------------------------------------------------------*/
+			
+			$(".tabs.v2").each(function(){ 
+				makeTabs2(this);
+			});
+			
+			/*---------------------------------------------------------*/
+			
+			$(document).on("awdtabs:change",function(e,a2){console.log(a2)})
+		});
+
+		</script>
+
+</head>
+<body>
+<h1>JQuery Tabs</h1>	
+	<p>Per il sorgente delle funzioni principali, si veda il sorgente di questa pagina</p>
+
+	<div class="esempi">
+	<h2>Tabs standard, attivate con una chiamata a jQuery.awdTabs(), non accessibili</h2>
+		<p><em>Con gli script disattivati, i tab diversi da primo rimarranno invisibili</em></p>
+	<div class="esempio">
+	<div class="rendering">
+<div class="tabs v0">
+	<nav>
+	<ul role="tablist">
+		<li role="tab" class="active" aria-selected="true" aria-controls="tab01">Tab 1</li>
+		<li role="tab" aria-selected="false" aria-controls="tab02">Tab 2</li>
+	</ul>
+</nav>
+<div class="tabcontent">
+	<section role="tabpanel" id="tab01" class="active" aria-hidden="false">
+		<header><h4>Tab 1</h4></header>
+		CONTENUTO 1
+	</section>
+	<section role="tabpanel" id="tab02" class="" aria-hidden="true">
+		<header><h4>Tab 2</h4></header>
+		CONTENUTO 2
+	</section>
+</div>
+</div>
+</div>
+	<div class="sorgente">
+		<h3>HTML</h3>
+		
+		<p>&lt;div class=&quot;tabs v0&quot;&gt;</p>
+		<p>&lt;nav&gt;</p>
+	<p>&lt;ul role=&quot;tablist&quot;&gt;</p>
+		<p>&lt;li role=&quot;tab&quot; class=&quot;active&quot; aria-selected=&quot;true&quot; aria-controls=&quot;tab01&quot;&gt;Tab 1&lt;/li&gt;</p>
+		<p>&lt;li role=&quot;tab&quot; aria-selected=&quot;false&quot; aria-controls=&quot;tab02&quot;&gt;Tab 2&lt;/li&gt;
+	&lt;/ul&gt;</p>
+<p>&lt;/nav&gt;</p>
+<p>&lt;div class=&quot;tabcontent&quot;&gt;</p>
+<p>	&lt;section role=&quot;tabpanel&quot; id=&quot;tab01&quot; class=&quot;active&quot; aria-hidden=&quot;false&quot;&gt;</p>
+		<p>&lt;header&gt;&lt;h4&gt;Tab 1&lt;/h4&gt;&lt;/header&gt;</p>
+		<p>CONTENUTO 1</p>
+	<p>&lt;/section&gt;</p>
+	<p>&lt;section role=&quot;tabpanel&quot; id=&quot;tab02&quot; class=&quot;&quot; aria-hidden=&quot;true&quot;&gt;</p>
+		<p>&lt;header&gt;&lt;h4&gt;Tab 2&lt;/h4&gt;&lt;/header&gt;</p>
+		<p>CONTENUTO 2</p>
+	<p>&lt;/section&gt;</p>
+<p>&lt;/div&gt;
+&lt;/div&gt;</p>
+<h3>CSS</h3>
+<p>.tabs > nav > ul > li.active {color: white; background-color: #4285f4;}</p>
+	<p>	.tabs .tabcontent > section {display:none; }</p>
+	<p>	.tabs .tabcontent > section.active {display:block}		</p>
+		
+	<h3>Javascript</h3>
+	
+	<p>jQuery.fn.extend({awdTabs: function(){return this.each(function(){makeTabs(this)})}});</p>
+	<p>$(".tabs.v0:first").awdTabs();</p>
+	</div>
+	</div>
+
+<h2>Tabs standard, attivate automaticamente in base alla classe, non accessibili</h2>
+	<p><em>Con gli script disattivati, i tab diversi da primo rimarranno invisibili</em></p>
+<div class="esempio">
+	<div class="rendering">	
+<div class="tabs v1">
+	<nav>
+	<ul role="tablist">
+		<li role="tab" class="active" aria-selected="true" aria-controls="tab11">Tab 1</li>
+		<li role="tab" aria-selected="false" aria-controls="tab12">Tab 2</li>
+	</ul>
+</nav>
+<div class="tabcontent">
+	<section role="tabpanel" id="tab11" class="active" aria-hidden="false">
+		<header><h4>Tab 1</h4></header>
+		CONTENUTO 1
+	</section>
+	<section role="tabpanel" id="tab12" class="" aria-hidden="true">
+		<header><h4>Tab 2</h4></header>
+		CONTENUTO 2
+	</section>
+</div>
+</div>
+</div>
+	<div class="sorgente">
+		<h3>HTML</h3>
+		<p>&lt;div class=&quot;tabs v1&quot;&gt;</p>
+		<p>...</p>
+	<h3>Javascript</h3>
+	<p>$(".tabs.v1").each(function(){ 				makeTabs(this);			});</p>
+	</div>
+	</div>
+<h2>Tabs standard, attivate automaticamente in base alla classe, accessibili</h2>
+<p><em>Con gli script disattivati, i tab saranno visualizzati uno sotto l'altro, come sezioni contigue</em></p>
+<div class="esempio">
+	<div class="rendering">
+
+<div class="tabs v1bis">
+	<nav>
+	<ul role="tablist">
+		<li role="tab" class="active" aria-selected="true" aria-controls="tab1b1">Tab 1</li>
+		<li role="tab" aria-selected="false" aria-controls="tab1b2">Tab 2</li>
+	</ul>
+</nav>
+<div class="tabcontent">
+	<section role="tabpanel" id="tab1b1" class="active" aria-hidden="false">
+		<header><h4>Tab 1</h4></header>
+		CONTENUTO 1
+	</section>
+	<section role="tabpanel" id="tab1b2" class="" aria-hidden="true">
+		<header><h4>Tab 2</h4></header>
+		CONTENUTO 2
+	</section>
+</div>
+</div>
+</div>
+	<div class="sorgente">
+	<h3>HTML</h3>
+		<p>&lt;div class=&quot;tabs v1bis&quot;&gt;</p>
+		<p>...</p>
+		<h3>CSS</h3>
+		<p>	.tabs.v1bis > nav {display:none;}</p>
+		<p>.tabs.v1bis .tabcontent > section {display:block; }</p>
+		<p>.tabs.v1bis.enabled > nav {display:block;}</p>
+		<p>.tabs.v1bis.enabled .tabcontent > section {display:none}		</p>
+		<p>.tabs.v1bis.enabled .tabcontent > section.active {display:block}</p>
+	<h3>Javascript</h3>
+	<p>$(".tabs.v1bis").each(function(){ 				makeTabs(this);			});</p>
+	</div>
+	</div>
+<h2>Tabs minimali (senza markup specifico), attivate automaticamente, accessibili</h2>
+<p><em>Con gli script disattivati, i tab saranno visualizzati uno sotto l'altro, come sezioni contigue</em></p>
+<div class="esempio">
+	<div class="rendering">
+<div class="tabs v2">
+	<section data-label="Tab 1">
+		<header><h4>Tab 1H</h4></header>
+		CONTENUTO 1
+	</section>
+	<section>
+		<header><h4>Tab 2</h4></header>
+		CONTENUTO 2
+	</section>
+	<section>
+		CONTENUTO 3
+	</section>
+</div>
+</div>
+<div class="sorgente">
+		<h3>HTML</h3>
+		
+		<p>&lt;div class=&quot;tabs v2&quot;&gt;</p>
+	<p>&lt;section data-label=&quot;Tab 1&quot;&gt;</p>
+		<p>&lt;header&gt;&lt;h4&gt;Tab 1H&lt;/h4&gt;&lt;/header&gt;</p>
+		<p>CONTENUTO 1</p>
+	<p>&lt;/section&gt;</p>
+	<p>&lt;section&gt;
+		&lt;header&gt;&lt;h4&gt;Tab 2&lt;/h4&gt;&lt;/header&gt;
+		CONTENUTO 2
+	&lt;/section&gt;</p>
+	<p>&lt;section&gt;
+		CONTENUTO 3
+	&lt;/section&gt;</p>
+<p>&lt;/div&gt;</p>
+		
+	<h3>Javascript</h3>
+	<p>$(".tabs.v2").each(function(){ 				makeTabs2(this);			});</p>
+	</div>
+	</div>
+
+</body>
+</html>
